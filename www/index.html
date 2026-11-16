@@ -30,7 +30,9 @@
     <nav class="tabs">
       <button class="tab active" data-tab="dashboard">Dashboard</button>
       <button class="tab" data-tab="playdays">Play Days</button>
-      <button class="tab" data-tab="payments">Payments</button>
+      <button class="tab" data-tab="payments">Membership Payments</button>
+      <button class="tab owner-only hidden" data-tab="membership">Monthly Fee & Exemptions</button>
+      <button class="tab" data-tab="expenses">Group Expenses</button>
       <button class="tab" data-tab="payouts">Owner Payouts</button>
       <button class="tab" data-tab="report">Monthly</button>
       <button class="tab owner-only hidden" data-tab="members">Members & Links</button>
@@ -51,11 +53,11 @@
           <strong id="stat-collected">0</strong>
         </div>
         <div class="stat-card">
-          <span class="stat-label">Balance to Collect</span>
+          <span class="stat-label">Current Month Balance</span>
           <strong id="stat-to-collect" class="text-danger">0</strong>
         </div>
         <div class="stat-card">
-          <span class="stat-label">Paid to Turf Owner</span>
+          <span class="stat-label">Total Expenses</span>
           <strong id="stat-paid-owner">0</strong>
         </div>
         <div class="stat-card">
@@ -65,15 +67,15 @@
       </div>
 
       <div class="card">
-        <h3>Member Balances</h3>
-        <p class="muted small">Positive balance = owes money. Negative = paid in advance.</p>
+        <h3>Current Month Membership Status</h3>
+        <p class="muted small">Monthly fee is fixed for the month. Supply contributors are shown as Exempt.</p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Member</th>
                 <th>Days</th>
-                <th>Due</th>
+                <th>Monthly Fee</th>
                 <th>Paid</th>
                 <th>Balance</th>
                 <th>Status</th>
@@ -113,7 +115,8 @@
         <input type="hidden" id="edit-payment-id" />
         <div class="form-row">
           <label>Member <select id="pay-member"></select></label>
-          <label>Date <input type="date" id="pay-date" /></label>
+          <label>Payment Date <input type="date" id="pay-date" /></label>
+          <label>For Month <input type="month" id="pay-month" /></label>
           <label>Amount <input type="number" id="pay-amount" placeholder="e.g. 500" step="1" /></label>
         </div>
         <div class="btn-row">
@@ -123,9 +126,49 @@
       </div>
 
       <div class="card">
-        <h3>Member Payment History</h3>
+        <h3>Membership Payment History</h3>
         <div id="payments-list" class="record-list"></div>
       </div>
+    </section>
+
+    <section id="tab-membership" class="tab-content owner-only hidden">
+      <div class="card">
+        <h3>Set Monthly Membership Fee</h3>
+        <p class="muted small">Set one fee for everyone for the selected month. It can change every month.</p>
+        <div class="form-row">
+          <label>Month <input type="month" id="fee-month" /></label>
+          <label>Monthly Fee (₹) <input type="number" id="fee-amount" min="0" step="1" placeholder="e.g. 500" /></label>
+        </div>
+        <button id="btn-save-fee" class="btn-primary">Save Monthly Fee</button>
+      </div>
+      <div class="card">
+        <h3>Exempt a Member for Bringing Supplies</h3>
+        <p class="muted small">For example: water, cricket balls, football, bat, grip, stumps or cones. Exemption applies only to the selected month.</p>
+        <div class="form-row">
+          <label>Member <select id="exempt-member"></select></label>
+          <label>Reason / Contribution <input type="text" id="exempt-reason" placeholder="e.g. Brought water for the group" /></label>
+        </div>
+        <button id="btn-save-exemption" class="btn-primary">Save Exemption</button>
+        <h4 style="margin-top:16px;">This Month's Exemptions</h4>
+        <div id="exemptions-list" class="record-list"></div>
+      </div>
+    </section>
+
+    <section id="tab-expenses" class="tab-content">
+      <div class="card owner-only hidden">
+        <h3 id="expense-form-title">Record Group Expense</h3>
+        <input type="hidden" id="edit-expense-id" />
+        <div class="form-row">
+          <label>Date <input type="date" id="expense-date" /></label>
+          <label>Category <select id="expense-category">
+            <option>Turf booking</option><option>Water</option><option>Cricket balls</option><option>Football</option><option>Bat</option><option>Grip</option><option>Stumps</option><option>Cones</option><option>Other</option>
+          </select></label>
+          <label>Amount (₹) <input type="number" id="expense-amount" min="1" step="1" placeholder="e.g. 1400" /></label>
+        </div>
+        <label>Note (Optional) <input type="text" id="expense-note" placeholder="Details" /></label>
+        <div class="btn-row"><button id="btn-save-expense" class="btn-primary">Save Expense</button><button id="btn-cancel-expense" class="btn-secondary hidden">Cancel</button></div>
+      </div>
+      <div class="card"><h3>Group Expense History</h3><div id="expenses-list" class="record-list"></div></div>
     </section>
 
     <section id="tab-payouts" class="tab-content">
@@ -171,9 +214,9 @@
               <tr>
                 <th>Member</th>
                 <th>Days</th>
-                <th>Share Due</th>
+                <th>Monthly Fee</th>
                 <th>Paid in Month</th>
-                <th>Month Net</th>
+                <th>Balance / Status</th>
               </tr>
             </thead>
             <tbody id="report-member-tbody"></tbody>
