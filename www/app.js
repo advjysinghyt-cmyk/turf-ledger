@@ -132,7 +132,7 @@ function renderDashboard() {
     const cls=ex||(!fee)||outstanding<=0.005?"pill-paid":paid>0?"pill-partial":"pill-unpaid";
     const tr=document.createElement("tr");
     if(m.id===state.viewerMemberId)tr.classList.add("highlight-row");
-    tr.innerHTML=`<td>${escapeHtml(m.name)}</td><td>${state.playDays.filter(d=>d.play_date.startsWith(ym)&&d.player_ids.includes(m.id)).length}</td><td>${formatINR(due)}</td><td>${formatINR(paid)}</td><td class="${outstanding>0?"text-danger":"text-success"}">${formatINR(outstanding)}</td><td><span class="pill ${cls}">${status}</span></td>`;
+    tr.innerHTML=`<td>${escapeHtml(m.name)}</td><td>${formatINR(due)}</td><td>${formatINR(paid)}</td><td class="${outstanding>0?"text-danger":"text-success"}">${formatINR(outstanding)}</td><td><span class="pill ${cls}">${status}</span></td>`;
     tbody.appendChild(tr);
   });
   document.getElementById("stat-days").textContent=totalDays;
@@ -144,15 +144,6 @@ function renderDashboard() {
 }
 
 function renderPlayDays() {
-  const checklist = document.getElementById("pd-players-checklist");
-  checklist.innerHTML = state.members.map(m => `
-    <label class="check-item">
-      <input type="checkbox" value="${m.id}" />
-      <span>${escapeHtml(m.name)}</span>
-    </label>
-  `).join("");
-
-  const memberMap = Object.fromEntries(state.members.map(m => [m.id, m.name]));
   const list = document.getElementById("playdays-list");
   if (!state.playDays.length) {
     list.innerHTML = `<p class="muted">No play days logged yet.</p>`;
@@ -160,8 +151,6 @@ function renderPlayDays() {
   }
 
   list.innerHTML = state.playDays.map(day => {
-    const count = day.player_ids.length;
-    const names = day.player_ids.map(id => memberMap[id] || "Removed").join(", ");
     const actions = state.isOwner ? `
       <div class="record-actions">
         <button class="btn-secondary btn-sm" onclick="editPlayDay('${day.id}')">Edit</button>
@@ -172,7 +161,6 @@ function renderPlayDays() {
       <div class="record-item">
         <div class="record-main">
           <div class="record-title">${day.play_date} • Turf cost: ${formatINR(day.turf_rate)}</div>
-          <div class="record-sub">${count} players • ${escapeHtml(names)}</div>
         </div>
         ${actions}
       </div>`;
@@ -257,7 +245,7 @@ function renderMonthlyReport() {
     const ex=exemptions.find(e=>e.member_id===m.id);
     const mpaid=payments.filter(p=>p.member_id===m.id).reduce((s,p)=>s+Number(p.amount),0);
     const mdue=ex?0:Number(fee?.fee_amount||0), outstanding=Math.max(0,mdue-mpaid);
-    tbody.innerHTML+=`<tr><td>${escapeHtml(m.name)}</td><td>${days.filter(d=>d.player_ids.includes(m.id)).length}</td><td>${ex?"Exempt":formatINR(mdue)}</td><td>${formatINR(mpaid)}</td><td class="${outstanding>0?"text-danger":"text-success"}">${ex?"Exempt":formatINR(outstanding)}</td></tr>`;
+    tbody.innerHTML+=`<tr><td>${escapeHtml(m.name)}</td><td>${ex?"Exempt":formatINR(mdue)}</td><td>${formatINR(mpaid)}</td><td class="${outstanding>0?"text-danger":"text-success"}">${ex?"Exempt":formatINR(outstanding)}</td></tr>`;
   });
   document.getElementById("rep-days").textContent=days.length;
   document.getElementById("rep-avg-week").textContent=(days.length/(new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7)),0).getDate()/7)).toFixed(1);
@@ -315,14 +303,13 @@ document.getElementById("btn-save-playday").onclick = async () => {
   const id = document.getElementById("edit-playday-id").value || null;
   const play_date = document.getElementById("pd-date").value;
   const turf_rate = Number(document.getElementById("pd-rate").value);
-  const player_ids = Array.from(document.querySelectorAll("#pd-players-checklist input:checked")).map(cb => cb.value);
 
-  if (!play_date || turf_rate <= 0 || player_ids.length === 0) {
-    return alert("Please enter date, valid turf rate, and select at least 1 player.");
+  if (!play_date || turf_rate <= 0) {
+    return alert("Please enter the play date and total turf amount.");
   }
 
   const ok = await runAdminRpc("admin_save_play_day", {
-    p_id: id, p_play_date: play_date, p_turf_rate: turf_rate, p_player_ids: player_ids
+    p_id: id, p_play_date: play_date, p_turf_rate: turf_rate, p_player_ids: []
   }, id ? "Play day updated" : "Play day added");
 
   if (ok) resetPlayDayForm();
@@ -336,9 +323,6 @@ window.editPlayDay = (id) => {
   document.getElementById("pd-rate").value = day.turf_rate;
   document.getElementById("playday-form-title").textContent = "Edit Play Day";
   document.getElementById("btn-cancel-playday").classList.remove("hidden");
-  document.querySelectorAll("#pd-players-checklist input").forEach(cb => {
-    cb.checked = day.player_ids.includes(cb.value);
-  });
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
 
@@ -354,7 +338,6 @@ function resetPlayDayForm() {
   document.getElementById("pd-rate").value = "1400";
   document.getElementById("playday-form-title").textContent = "Log Play Day";
   document.getElementById("btn-cancel-playday").classList.add("hidden");
-  document.querySelectorAll("#pd-players-checklist input").forEach(cb => cb.checked = false);
 }
 document.getElementById("btn-cancel-playday").onclick = resetPlayDayForm;
 
