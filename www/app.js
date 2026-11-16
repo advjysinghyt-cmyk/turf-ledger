@@ -266,7 +266,12 @@ function renderMonthlyReport() {
   const turfCost = sum(days, "turf_rate");
   const cashOut = movement.payouts + movement.expenses;
   const totalExpenses = turfCost + movement.expenses;
-  const ownerDue = turfCost - movement.payouts;
+  // Owner dues are cumulative: all turf costs accrued up to this month-end,
+  // less all payouts actually made to the owner up to the same date.
+  const monthEnd = ym + "-31";
+  const accruedTurfThroughMonth = sum(state.playDays.filter(d => d.play_date <= monthEnd), "turf_rate");
+  const ownerPaidThroughMonth = sum(state.ownerPayouts.filter(p => p.payout_date <= monthEnd), "amount");
+  const ownerDue = accruedTurfThroughMonth - ownerPaidThroughMonth;
   const fee = state.monthlyFees.find(f => f.month_start === start);
   const exemptions = state.memberExemptions.filter(e => e.month_start === start);
   const due = state.members.reduce((total, m) => total + (exemptions.some(e => e.member_id === m.id) ? 0 : Number(fee?.fee_amount || 0)), 0);
