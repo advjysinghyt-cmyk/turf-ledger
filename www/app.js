@@ -526,6 +526,112 @@ document.getElementById("btn-refresh").onclick = async () => {
   showToast("Ledger refreshed");
 };
 
+
+function buildMonthlyPdf() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    alert("PDF library could not be loaded. Please check your internet connection and try again.");
+    return null;
+  }
+  const ym = document.getElementById("report-month").value || currentMonthISO();
+  const start = ym + "-01";
+  const [year, month] = ym.split("-").map(Number);
+  const monthEnd = new Date(year, month, 0).getDate();
+  const end = ym + "-" + String(monthEnd).padStart(2, "0");
+  const monthLabel = new Date(year, month - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const days = state.playDays.filter(d => d.play_date.startsWith(ym)).sort((a,b) => a.play_date.localeCompare(b.play_date));
+  const feePayments = state.memberPayments.filter(p => p.membership_month === start);
+  const receipts = state.memberPayments.filter(p => p.pay_date.startsWith(ym));
+  const payouts = state.ownerPayouts.filter(p => p.payout_date.startsWith(ym));
+  const expenses = state.groupExpenses.filter(e => e.expense_date.startsWith(ym));
+  const opening = cashMovementBefore(start);
+  const collected = sum(receipts, "amount");
+  const ownerPaid = sum(payouts, "amount");
+  const groupPaid = sum(expenses, "amount");
+  const closing = opening + collected - ownerPaid - groupPaid;
+  const turfCost = sum(days, "turf_rate");
+  const totalExpenses = turfCost + groupPaid;
+  const allTurfThroughMonth = sum(state.playDays.filter(d => d.play_date <= end), "turf_rate");
+  const allPayoutsThroughMonth = sum(state.ownerPayouts.filter(p => p.payout_date <= end), "amount");
+  const ownerDue = allTurfThroughMonth - allPayoutsThroughMonth;
+  const fee = state.monthlyFees.find(f => f.month_start === start);
+  const exemptions = state.memberExemptions.filter(e => e.month_start === start);
+  const exemptionByMember = new Map(exemptions.map(e => [e.member_id, e]));
+  const names = new Map(state.members.map(m => [m.id, m.name]));
+  const totalMembershipDue = state.members.reduce((t,m) => t + (exemptionByMember.has(m.id) ? 0 : Number(fee?.fee_amount || 0)), 0);
+  const paidForMonth = sum(feePayments, "amount");
+  const doc = new window.jspdf.jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("TURF LEDGER", 14, 16);
+  doc.setFontSize(12);
+  doc.text("Monthly Financial Report - " + monthLabel, 14, 24);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text("Generated on " + new Date().toLocaleString("en-IN"), 14, 30);
+  const summary = [
+    ["Play days", String(days.length)],
+    ["Turf cost (recorded once)", "Rs. " + formatINR(turfCost)],
+    ["Group expenses", "Rs. " + formatINR(groupPaid)],
+    ["Total expenses (turf + group)", "Rs. " + formatINR(totalExpenses)],
+    ["Membership cash received this month", "Rs. " + formatINR(collected)],
+    ["Paid to turf owner this month", "Rs. " + formatINR(ownerPaid)],
+    ["Turf amount due to owner (cumulative)", "Rs. " + formatINR(ownerDue)],
+    ["Opening cash balance", "Rs. " + formatINR(opening)],
+    ["Closing cash balance (carry-forward)", "Rs. " + formatINR(closing)],
+    ["Membership fee per member", fee ? "Rs. " + formatINR(fee.fee_amount) : "Not set"],
+    ["Membership dues for selected month", "Rs. " + formatINR(Math.max(0, totalMembershipDue - paidForMonth))]
+  ];
+  doc.autoTable({ startY: 35, head: [["Financial Summary", "Amount / Value"]], body: summary, theme: "grid", styles: { fontSize: 8, cellPadding: 2.2 }, headStyles: { fillColor: [27, 107, 58] } });
+  let y = doc.lastAutoTable.finalY + 7;
+  const addTable = (title, head, body, columns) => {
+    if (y > 255) { doc.addPage(); y = 15; }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text(title, 14, y);
+    doc.autoTable({ startY: y + 2, head: [head], body: body.length ? body : [["No records for this month", ...Array(Math.max(0, head.length - 1)).fill("")]], theme: "grid", styles: { fontSize: 7.5, cellPadding: 2, overflow: "linebreak" }, headStyles: { fillColor: [27, 107, 58] }, columnStyles: columns || {} });
+    y = doc.lastAutoTable.finalY + 7;
+  };
+  addTable("Play Days - Turf Costs", ["Date", "Total Turf Cost"], days.map(d => [d.play_date, "Rs. " + formatINR(d.turf_rate)]));
+  addTable("Member-wise Monthly Fee Status", ["Member", "Monthly Fee", "Paid for Month", "Balance / Status"], state.members.map(m => {
+    const ex = exemptionByMember.get(m.id);
+    const memberFee = ex ? 0 : Number(fee?.fee_amount || 0);
+    const paid = sum(feePayments.filter(p => p.member_id === m.id), "amount");
+    return [m.name, ex ? "Exempt" : "Rs. " + formatINR(memberFee), "Rs. " + formatINR(paid), ex ? "Exempt" : "Rs. " + formatINR(Math.max(0, memberFee - paid))];
+  }));
+  addTable("Membership Payments (assigned to this month)", ["Payment Date", "Member", "Amount"], feePayments.map(p => [p.pay_date, names.get(p.member_id) || "Removed member", "Rs. " + formatINR(p.amount)]));
+  addTable("Supply Contributions / Fee Exemptions", ["Member", "Reason / Contribution"], exemptions.map(e => [names.get(e.member_id) || "Removed member", e.reason || ""]));
+  addTable("Payments Received During This Month", ["Payment Date", "Member", "Membership Month", "Amount"], receipts.map(p => [p.pay_date, names.get(p.member_id) || "Removed member", (p.membership_month || "").slice(0,7), "Rs. " + formatINR(p.amount)]));
+  addTable("Payments Made to Turf Owner", ["Date", "Amount", "Note"], payouts.map(p => [p.payout_date, "Rs. " + formatINR(p.amount), p.note || ""]));
+  addTable("Group Expenses", ["Date", "Category", "Amount", "Note"], expenses.map(e => [e.expense_date, e.category || "", "Rs. " + formatINR(e.amount), e.note || ""]));
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Turf Ledger • " + monthLabel + " • Page " + i + " of " + pageCount, pageWidth / 2, 290, { align: "center" });
+  }
+  return { doc, monthLabel, fileName: "Turf-Ledger-" + ym + ".pdf" };
+}
+
+document.getElementById("btn-share-pdf").onclick = async () => {
+  const result = buildMonthlyPdf();
+  if (!result) return;
+  const blob = result.doc.output("blob");
+  const file = new File([blob], result.fileName, { type: "application/pdf" });
+  try {
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: "Turf Ledger - " + result.monthLabel, text: "Monthly Turf Ledger records" });
+      showToast("PDF ready to share");
+    } else {
+      result.doc.save(result.fileName);
+      showToast("PDF downloaded. You can share it from your Downloads folder.");
+    }
+  } catch (error) {
+    if (error && error.name === "AbortError") return;
+    result.doc.save(result.fileName);
+    showToast("PDF saved. You can share it from your Downloads folder.");
+  }
+};
+
 document.getElementById("report-month").onchange = renderMonthlyReport;
 document.getElementById("fee-month").onchange = renderMembership;
 document.getElementById("btn-copy-owner").onclick = () => copyText("owner-link-display");
