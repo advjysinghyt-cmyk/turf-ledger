@@ -108,39 +108,57 @@ function renderAll() {
   if (state.isOwner) renderMembersAdmin();
 }
 
+function sum(items, field) { return items.reduce((total, item) => total + Number(item[field] || 0), 0); }
+
+function cashMovementBefore(date) {
+  const receipts = sum(state.memberPayments.filter(p => p.pay_date < date), "amount");
+  const payouts = sum(state.ownerPayouts.filter(p => p.payout_date < date), "amount");
+  const expenses = sum(state.groupExpenses.filter(e => e.expense_date < date), "amount");
+  return receipts - payouts - expenses;
+}
+
+function cashMovementDuring(month) {
+  const receipts = sum(state.memberPayments.filter(p => p.pay_date.startsWith(month)), "amount");
+  const payouts = sum(state.ownerPayouts.filter(p => p.payout_date.startsWith(month)), "amount");
+  const expenses = sum(state.groupExpenses.filter(e => e.expense_date.startsWith(month)), "amount");
+  return { receipts, payouts, expenses, net: receipts - payouts - expenses };
+}
+
 function renderDashboard() {
   const totalDays = state.playDays.length;
-  const totalTurfCost = state.playDays.reduce((s,d)=>s+Number(d.turf_rate),0);
-  const totalCollected = state.memberPayments.reduce((s,p)=>s+Number(p.amount),0);
-  const allExpenses = totalTurfCost + state.groupExpenses.reduce((s,e)=>s+Number(e.amount),0) + state.ownerPayouts.reduce((s,o)=>s+Number(o.amount),0);
-  const cash = totalCollected - allExpenses;
+  const totalTurfCost = sum(state.playDays, "turf_rate");
+  const totalCollected = sum(state.memberPayments, "amount");
+  // Cash leaves the fund only when a turf-owner payout or group-expense payment is recorded.
+  // Play-day turf costs are tracked separately to avoid counting the same turf bill twice.
+  const totalCashOut = sum(state.ownerPayouts, "amount") + sum(state.groupExpenses, "amount");
+  const cash = totalCollected - totalCashOut;
   const ym = currentMonthISO();
   const monthStart = ym + "-01";
-  const fee = state.monthlyFees.find(f=>f.month_start===monthStart);
-  const exemptions = state.memberExemptions.filter(e=>e.month_start===monthStart);
-  const payments = state.memberPayments.filter(p=>p.membership_month===monthStart);
+  const fee = state.monthlyFees.find(f => f.month_start === monthStart);
+  const exemptions = state.memberExemptions.filter(e => e.month_start === monthStart);
+  const payments = state.memberPayments.filter(p => p.membership_month === monthStart);
   let balance = 0;
-  const tbody=document.getElementById("dashboard-member-tbody");
-  tbody.innerHTML="";
-  state.members.forEach(m=>{
-    const ex=exemptions.find(e=>e.member_id===m.id);
-    const paid=payments.filter(p=>p.member_id===m.id).reduce((s,p)=>s+Number(p.amount),0);
-    const due=ex?0:(fee?Number(fee.fee_amount):0);
-    const outstanding=Math.max(0,due-paid);
-    balance+=outstanding;
-    const status=ex?"Exempt":!fee?"Fee not set":outstanding<=0.005?"Paid":paid>0?"Partial":"Unpaid";
-    const cls=ex||(!fee)||outstanding<=0.005?"pill-paid":paid>0?"pill-partial":"pill-unpaid";
-    const tr=document.createElement("tr");
-    if(m.id===state.viewerMemberId)tr.classList.add("highlight-row");
-    tr.innerHTML=`<td>${escapeHtml(m.name)}</td><td>${formatINR(due)}</td><td>${formatINR(paid)}</td><td class="${outstanding>0?"text-danger":"text-success"}">${formatINR(outstanding)}</td><td><span class="pill ${cls}">${status}</span></td>`;
+  const tbody = document.getElementById("dashboard-member-tbody");
+  tbody.innerHTML = "";
+  state.members.forEach(m => {
+    const ex = exemptions.find(e => e.member_id === m.id);
+    const paid = sum(payments.filter(p => p.member_id === m.id), "amount");
+    const due = ex ? 0 : (fee ? Number(fee.fee_amount) : 0);
+    const outstanding = Math.max(0, due - paid);
+    balance += outstanding;
+    const status = ex ? "Exempt" : !fee ? "Fee not set" : outstanding <= 0.005 ? "Paid" : paid > 0 ? "Partial" : "Unpaid";
+    const cls = ex || !fee || outstanding <= 0.005 ? "pill-paid" : paid > 0 ? "pill-partial" : "pill-unpaid";
+    const tr = document.createElement("tr");
+    if (m.id === state.viewerMemberId) tr.classList.add("highlight-row");
+    tr.innerHTML = `<td>${escapeHtml(m.name)}</td><td>${formatINR(due)}</td><td>${formatINR(paid)}</td><td class="${outstanding > 0 ? "text-danger" : "text-success"}">${formatINR(outstanding)}</td><td><span class="pill ${cls}">${status}</span></td>`;
     tbody.appendChild(tr);
   });
-  document.getElementById("stat-days").textContent=totalDays;
-  document.getElementById("stat-cost").textContent=formatINR(totalTurfCost);
-  document.getElementById("stat-collected").textContent=formatINR(totalCollected);
-  document.getElementById("stat-to-collect").textContent=formatINR(balance);
-  document.getElementById("stat-paid-owner").textContent=formatINR(allExpenses);
-  document.getElementById("stat-cash").textContent=formatINR(cash);
+  document.getElementById("stat-days").textContent = totalDays;
+  document.getElementById("stat-cost").textContent = formatINR(totalTurfCost);
+  document.getElementById("stat-collected").textContent = formatINR(totalCollected);
+  document.getElementById("stat-to-collect").textContent = formatINR(balance);
+  document.getElementById("stat-paid-owner").textContent = formatINR(totalCashOut);
+  document.getElementById("stat-cash").textContent = formatINR(cash);
 }
 
 function renderPlayDays() {
@@ -226,34 +244,41 @@ function renderExpenses() {
 }
 
 function renderMonthlyReport() {
-  const input=document.getElementById("report-month");
-  if(!input.value)input.value=currentMonthISO();
-  const ym=input.value, start=ym+"-01";
-  const days=state.playDays.filter(d=>d.play_date.startsWith(ym));
-  const payments=state.memberPayments.filter(p=>p.membership_month===start);
-  const expenses=state.groupExpenses.filter(e=>e.expense_date.startsWith(ym));
-  const payouts=state.ownerPayouts.filter(o=>o.payout_date.startsWith(ym));
-  const fee=state.monthlyFees.find(f=>f.month_start===start);
-  const exemptions=state.memberExemptions.filter(e=>e.month_start===start);
-  const collected=payments.reduce((s,p)=>s+Number(p.amount),0);
-  const expenseTotal=days.reduce((s,d)=>s+Number(d.turf_rate),0)+expenses.reduce((s,e)=>s+Number(e.amount),0)+payouts.reduce((s,p)=>s+Number(p.amount),0);
-  const due=state.members.reduce((s,m)=>s+(exemptions.some(e=>e.member_id===m.id)?0:Number(fee?.fee_amount||0)),0);
-  const paid=state.members.reduce((s,m)=>s+payments.filter(p=>p.member_id===m.id).reduce((a,p)=>a+Number(p.amount),0),0);
-  const tbody=document.getElementById("report-member-tbody");tbody.innerHTML="";
-  const names=Object.fromEntries(state.members.map(m=>[m.id,m.name]));
-  state.members.forEach(m=>{
-    const ex=exemptions.find(e=>e.member_id===m.id);
-    const mpaid=payments.filter(p=>p.member_id===m.id).reduce((s,p)=>s+Number(p.amount),0);
-    const mdue=ex?0:Number(fee?.fee_amount||0), outstanding=Math.max(0,mdue-mpaid);
-    tbody.innerHTML+=`<tr><td>${escapeHtml(m.name)}</td><td>${ex?"Exempt":formatINR(mdue)}</td><td>${formatINR(mpaid)}</td><td class="${outstanding>0?"text-danger":"text-success"}">${ex?"Exempt":formatINR(outstanding)}</td></tr>`;
+  const input = document.getElementById("report-month");
+  if (!input.value) input.value = currentMonthISO();
+  const ym = input.value, start = ym + "-01";
+  const days = state.playDays.filter(d => d.play_date.startsWith(ym));
+  // Fee settlement is assigned to the selected membership month.
+  const feePayments = state.memberPayments.filter(p => p.membership_month === start);
+  // Cash accounting uses the actual date money entered or left the group fund.
+  const movement = cashMovementDuring(ym);
+  const opening = cashMovementBefore(start);
+  const closing = opening + movement.net;
+  const turfCost = sum(days, "turf_rate");
+  const cashOut = movement.payouts + movement.expenses;
+  const fee = state.monthlyFees.find(f => f.month_start === start);
+  const exemptions = state.memberExemptions.filter(e => e.month_start === start);
+  const due = state.members.reduce((total, m) => total + (exemptions.some(e => e.member_id === m.id) ? 0 : Number(fee?.fee_amount || 0)), 0);
+  const paidTowardMonth = sum(feePayments, "amount");
+  const tbody = document.getElementById("report-member-tbody");
+  tbody.innerHTML = "";
+  state.members.forEach(m => {
+    const ex = exemptions.find(e => e.member_id === m.id);
+    const memberPaid = sum(feePayments.filter(p => p.member_id === m.id), "amount");
+    const memberDue = ex ? 0 : Number(fee?.fee_amount || 0);
+    const outstanding = Math.max(0, memberDue - memberPaid);
+    tbody.innerHTML += `<tr><td>${escapeHtml(m.name)}</td><td>${ex ? "Exempt" : formatINR(memberDue)}</td><td>${formatINR(memberPaid)}</td><td class="${outstanding > 0 ? "text-danger" : "text-success"}">${ex ? "Exempt" : formatINR(outstanding)}</td></tr>`;
   });
-  document.getElementById("rep-days").textContent=days.length;
-  document.getElementById("rep-avg-week").textContent=(days.length/(new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7)),0).getDate()/7)).toFixed(1);
-  document.getElementById("rep-cost").textContent=formatINR(expenseTotal);
-  document.getElementById("rep-collected").textContent=formatINR(collected);
-  document.getElementById("rep-paid").textContent=formatINR(expenseTotal);
-  document.getElementById("rep-cash").textContent=formatINR(collected-expenseTotal);
-  document.getElementById("rep-balance").textContent=formatINR(Math.max(0,due-paid));
+  const daysInMonth = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0).getDate();
+  document.getElementById("rep-days").textContent = days.length;
+  document.getElementById("rep-avg-week").textContent = (days.length / (daysInMonth / 7)).toFixed(1);
+  document.getElementById("rep-cost").textContent = formatINR(turfCost);
+  document.getElementById("rep-collected").textContent = formatINR(movement.receipts);
+  document.getElementById("rep-paid").textContent = formatINR(cashOut);
+  document.getElementById("rep-cash").textContent = formatINR(movement.net);
+  document.getElementById("rep-opening").textContent = formatINR(opening);
+  document.getElementById("rep-closing").textContent = formatINR(closing);
+  document.getElementById("rep-balance").textContent = formatINR(Math.max(0, due - paidTowardMonth));
 }
 
 function renderMembersAdmin() {
@@ -525,7 +550,7 @@ document.getElementById("btn-save-expense").onclick=async()=>{
 };
 window.editExpense=id=>{const e=state.groupExpenses.find(x=>x.id===id);if(!e)return;document.getElementById("edit-expense-id").value=e.id;document.getElementById("expense-date").value=e.expense_date;document.getElementById("expense-category").value=e.category;document.getElementById("expense-amount").value=e.amount;document.getElementById("expense-note").value=e.note||"";document.getElementById("expense-form-title").textContent="Edit Group Expense";document.getElementById("btn-cancel-expense").classList.remove("hidden");};
 window.deleteExpense=async id=>{if(confirm("Delete this expense?"))await runAdminRpc("admin_delete_expense",{p_id:id},"Expense deleted");};
-function resetExpenseForm(){document.getElementById("edit-expense-id").value="";document.getElementById("expense-date").value=todayISO();document.getElementById("expense-category").value="Turf booking";document.getElementById("expense-amount").value="";document.getElementById("expense-note").value="";document.getElementById("expense-form-title").textContent="Record Group Expense";document.getElementById("btn-cancel-expense").classList.add("hidden");}
+function resetExpenseForm(){document.getElementById("edit-expense-id").value="";document.getElementById("expense-date").value=todayISO();document.getElementById("expense-category").value="Water";document.getElementById("expense-amount").value="";document.getElementById("expense-note").value="";document.getElementById("expense-form-title").textContent="Record Group Expense";document.getElementById("btn-cancel-expense").classList.add("hidden");}
 document.getElementById("btn-cancel-expense").onclick=resetExpenseForm;
 document.getElementById("expense-date").value=todayISO();
 loadLedger();
