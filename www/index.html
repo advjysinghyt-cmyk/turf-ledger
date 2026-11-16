@@ -74,7 +74,6 @@
             <thead>
               <tr>
                 <th>Member</th>
-                <th>Days</th>
                 <th>Monthly Fee</th>
                 <th>Paid</th>
                 <th>Balance</th>
@@ -95,8 +94,7 @@
           <label>Date <input type="date" id="pd-date" /></label>
           <label>Turf Rate <input type="number" id="pd-rate" value="1400" step="1" /></label>
         </div>
-        <label>Select Players Who Played:</label>
-        <div id="pd-players-checklist" class="checklist"></div>
+        <p class="muted small">Only the play date and total turf amount are recorded. Player attendance is not collected and does not affect membership fees.</p>
         <div class="btn-row">
           <button id="btn-save-playday" class="btn-primary">Save Play Day</button>
           <button id="btn-cancel-playday" class="btn-secondary hidden">Cancel</button>
@@ -202,7 +200,7 @@
           <div class="stat-card"><span class="stat-label">Avg Days / Week</span><strong id="rep-avg-week">0</strong></div>
           <div class="stat-card"><span class="stat-label">Turf Cost</span><strong id="rep-cost">0</strong></div>
           <div class="stat-card"><span class="stat-label">Collected</span><strong id="rep-collected">0</strong></div>
-          <div class="stat-card"><span class="stat-label">Paid to Owner</span><strong id="rep-paid">0</strong></div>
+          <div class="stat-card"><span class="stat-label">Total Expenses</span><strong id="rep-paid">0</strong></div>
           <div class="stat-card"><span class="stat-label">Monthly Cash Delta</span><strong id="rep-cash">0</strong></div>
           <div class="stat-card"><span class="stat-label">Month Balance Due</span><strong id="rep-balance">0</strong></div>
         </div>
