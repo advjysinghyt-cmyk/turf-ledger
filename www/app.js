@@ -161,7 +161,6 @@ function renderPlayDays() {
 
   list.innerHTML = state.playDays.map(day => {
     const count = day.player_ids.length;
-    const perHead = count > 0 ? Number(day.turf_rate) / count : 0;
     const names = day.player_ids.map(id => memberMap[id] || "Removed").join(", ");
     const actions = state.isOwner ? `
       <div class="record-actions">
@@ -172,8 +171,8 @@ function renderPlayDays() {
     return `
       <div class="record-item">
         <div class="record-main">
-          <div class="record-title">${day.play_date} • Rate: ${formatINR(day.turf_rate)} (${count} players)</div>
-          <div class="record-sub"><strong>Per head: ${formatINR(perHead)}</strong><br/>Players: ${escapeHtml(names)}</div>
+          <div class="record-title">${day.play_date} • Turf cost: ${formatINR(day.turf_rate)}</div>
+          <div class="record-sub">${count} players • ${escapeHtml(names)}</div>
         </div>
         ${actions}
       </div>`;
