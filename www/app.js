@@ -128,8 +128,8 @@ function renderDashboard() {
     const due=ex?0:(fee?Number(fee.fee_amount):0);
     const outstanding=Math.max(0,due-paid);
     balance+=outstanding;
-    const status=ex?"Exempt":outstanding<=0.005?"Paid":paid>0?"Partial":"Unpaid";
-    const cls=ex||outstanding<=0.005?"pill-paid":paid>0?"pill-partial":"pill-unpaid";
+    const status=ex?"Exempt":!fee?"Fee not set":outstanding<=0.005?"Paid":paid>0?"Partial":"Unpaid";
+    const cls=ex||(!fee)||outstanding<=0.005?"pill-paid":paid>0?"pill-partial":"pill-unpaid";
     const tr=document.createElement("tr");
     if(m.id===state.viewerMemberId)tr.classList.add("highlight-row");
     tr.innerHTML=`<td>${escapeHtml(m.name)}</td><td>${state.playDays.filter(d=>d.play_date.startsWith(ym)&&d.player_ids.includes(m.id)).length}</td><td>${formatINR(due)}</td><td>${formatINR(paid)}</td><td class="${outstanding>0?"text-danger":"text-success"}">${formatINR(outstanding)}</td><td><span class="pill ${cls}">${status}</span></td>`;
@@ -523,11 +523,6 @@ document.getElementById("pay-date").value = todayISO();
 document.getElementById("out-date").value = todayISO();
 document.getElementById("pay-month").value = currentMonthISO();
 document.getElementById("fee-month").value = currentMonthISO();
-document.getElementById("exempt-month").value = currentMonthISO();
-document.getElementById("exempt-month").onchange = () => {
-  document.getElementById("fee-month").value = document.getElementById("exempt-month").value;
-  renderMembership();
-};
 document.getElementById("btn-save-fee").onclick = async () => {
   const month=document.getElementById("fee-month").value, amount=Number(document.getElementById("fee-amount").value);
   if(!month || !Number.isFinite(amount) || amount<0)return alert("Enter a month and valid fee.");
