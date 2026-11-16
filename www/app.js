@@ -112,7 +112,7 @@ function renderDashboard() {
   const totalDays = state.playDays.length;
   const totalTurfCost = state.playDays.reduce((s,d)=>s+Number(d.turf_rate),0);
   const totalCollected = state.memberPayments.reduce((s,p)=>s+Number(p.amount),0);
-  const allExpenses = state.groupExpenses.reduce((s,e)=>s+Number(e.amount),0) + state.ownerPayouts.reduce((s,o)=>s+Number(o.amount),0);
+  const allExpenses = totalTurfCost + state.groupExpenses.reduce((s,e)=>s+Number(e.amount),0) + state.ownerPayouts.reduce((s,o)=>s+Number(o.amount),0);
   const cash = totalCollected - allExpenses;
   const ym = currentMonthISO();
   const monthStart = ym + "-01";
@@ -249,7 +249,7 @@ function renderMonthlyReport() {
   const fee=state.monthlyFees.find(f=>f.month_start===start);
   const exemptions=state.memberExemptions.filter(e=>e.month_start===start);
   const collected=payments.reduce((s,p)=>s+Number(p.amount),0);
-  const expenseTotal=expenses.reduce((s,e)=>s+Number(e.amount),0)+payouts.reduce((s,p)=>s+Number(p.amount),0);
+  const expenseTotal=days.reduce((s,d)=>s+Number(d.turf_rate),0)+expenses.reduce((s,e)=>s+Number(e.amount),0)+payouts.reduce((s,p)=>s+Number(p.amount),0);
   const due=state.members.reduce((s,m)=>s+(exemptions.some(e=>e.member_id===m.id)?0:Number(fee?.fee_amount||0)),0);
   const paid=state.members.reduce((s,m)=>s+payments.filter(p=>p.member_id===m.id).reduce((a,p)=>a+Number(p.amount),0),0);
   const tbody=document.getElementById("report-member-tbody");tbody.innerHTML="";
