@@ -132,7 +132,11 @@ function renderDashboard() {
   const totalCollected = sum(state.memberPayments, "amount");
   // Cash leaves the fund only when a turf-owner payout or group-expense payment is recorded.
   // Play-day turf costs are tracked separately to avoid counting the same turf bill twice.
-  const totalCashOut = sum(state.ownerPayouts, "amount") + sum(state.groupExpenses, "amount");
+  const totalOwnerPaid = sum(state.ownerPayouts, "amount");
+  const totalGroupExpenses = sum(state.groupExpenses, "amount");
+  const totalExpenses = totalTurfCost + totalGroupExpenses;
+  const ownerDue = totalTurfCost - totalOwnerPaid;
+  const totalCashOut = totalOwnerPaid + totalGroupExpenses;
   const cash = totalCollected - totalCashOut;
   const ym = currentMonthISO();
   const monthStart = ym + "-01";
@@ -160,6 +164,9 @@ function renderDashboard() {
   document.getElementById("stat-collected").textContent = formatINR(totalCollected);
   document.getElementById("stat-to-collect").textContent = formatINR(balance);
   document.getElementById("stat-paid-owner").textContent = formatINR(totalCashOut);
+  document.getElementById("stat-expenses").textContent = formatINR(totalExpenses);
+  document.getElementById("stat-owner-paid").textContent = formatINR(totalOwnerPaid);
+  document.getElementById("stat-owner-due").textContent = formatINR(ownerDue);
   document.getElementById("stat-cash").textContent = formatINR(cash);
 }
 
@@ -258,6 +265,8 @@ function renderMonthlyReport() {
   const closing = opening + movement.net;
   const turfCost = sum(days, "turf_rate");
   const cashOut = movement.payouts + movement.expenses;
+  const totalExpenses = turfCost + movement.expenses;
+  const ownerDue = turfCost - movement.payouts;
   const fee = state.monthlyFees.find(f => f.month_start === start);
   const exemptions = state.memberExemptions.filter(e => e.month_start === start);
   const due = state.members.reduce((total, m) => total + (exemptions.some(e => e.member_id === m.id) ? 0 : Number(fee?.fee_amount || 0)), 0);
@@ -277,6 +286,9 @@ function renderMonthlyReport() {
   document.getElementById("rep-cost").textContent = formatINR(turfCost);
   document.getElementById("rep-collected").textContent = formatINR(movement.receipts);
   document.getElementById("rep-paid").textContent = formatINR(cashOut);
+  document.getElementById("rep-expenses").textContent = formatINR(totalExpenses);
+  document.getElementById("rep-owner-paid").textContent = formatINR(movement.payouts);
+  document.getElementById("rep-owner-due").textContent = formatINR(ownerDue);
   document.getElementById("rep-cash").textContent = formatINR(movement.net);
   document.getElementById("rep-opening").textContent = formatINR(opening);
   document.getElementById("rep-closing").textContent = formatINR(closing);
