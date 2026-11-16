@@ -1,0 +1,8 @@
+{
+  "appId": "com.turfgroup.ledger",
+  "appName": "Turf Ledger",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
