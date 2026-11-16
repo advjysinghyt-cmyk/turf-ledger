@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Turf Ledger</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Turf Ledger</h1>
+      <span id="role-badge" class="badge">Checking access...</span>
+    </div>
+    <button id="btn-refresh" class="btn-icon" title="Refresh data">↻ Refresh</button>
+  </header>
+
+  <main id="access-screen" class="container hidden">
+    <div class="card">
+      <h2>Enter Access Key</h2>
+      <p class="muted">Open your personal private link, or paste your secret key below.</p>
+      <input type="text" id="manual-key-input" placeholder="Paste your access key here..." />
+      <button id="btn-save-key" class="btn-primary full">Open Ledger</button>
+      <p id="access-error" class="error-text"></p>
+    </div>
+  </main>
+
+  <main id="app-screen" class="container hidden">
+    <nav class="tabs">
+      <button class="tab active" data-tab="dashboard">Dashboard</button>
+      <button class="tab" data-tab="playdays">Play Days</button>
+      <button class="tab" data-tab="payments">Payments</button>
+      <button class="tab" data-tab="payouts">Owner Payouts</button>
+      <button class="tab" data-tab="report">Monthly</button>
+      <button class="tab owner-only hidden" data-tab="members">Members & Links</button>
+    </nav>
+
+    <section id="tab-dashboard" class="tab-content active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Total Play Days</span>
+          <strong id="stat-days">0</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Total Turf Cost</span>
+          <strong id="stat-cost">0</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Total Collected</span>
+          <strong id="stat-collected">0</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Balance to Collect</span>
+          <strong id="stat-to-collect" class="text-danger">0</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Paid to Turf Owner</span>
+          <strong id="stat-paid-owner">0</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Cash in Hand</span>
+          <strong id="stat-cash" class="text-success">0</strong>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Member Balances</h3>
+        <p class="muted small">Positive balance = owes money. Negative = paid in advance.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Days</th>
+                <th>Due</th>
+                <th>Paid</th>
+                <th>Balance</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="dashboard-member-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-playdays" class="tab-content">
+      <div class="card owner-only hidden">
+        <h3 id="playday-form-title">Log Play Day</h3>
+        <input type="hidden" id="edit-playday-id" />
+        <div class="form-row">
+          <label>Date <input type="date" id="pd-date" /></label>
+          <label>Turf Rate <input type="number" id="pd-rate" value="1400" step="1" /></label>
+        </div>
+        <label>Select Players Who Played:</label>
+        <div id="pd-players-checklist" class="checklist"></div>
+        <div class="btn-row">
+          <button id="btn-save-playday" class="btn-primary">Save Play Day</button>
+          <button id="btn-cancel-playday" class="btn-secondary hidden">Cancel</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Play Day History</h3>
+        <div id="playdays-list" class="record-list"></div>
+      </div>
+    </section>
+
+    <section id="tab-payments" class="tab-content">
+      <div class="card owner-only hidden">
+        <h3 id="payment-form-title">Record Member Payment</h3>
+        <input type="hidden" id="edit-payment-id" />
+        <div class="form-row">
+          <label>Member <select id="pay-member"></select></label>
+          <label>Date <input type="date" id="pay-date" /></label>
+          <label>Amount <input type="number" id="pay-amount" placeholder="e.g. 500" step="1" /></label>
+        </div>
+        <div class="btn-row">
+          <button id="btn-save-payment" class="btn-primary">Save Payment</button>
+          <button id="btn-cancel-payment" class="btn-secondary hidden">Cancel</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Member Payment History</h3>
+        <div id="payments-list" class="record-list"></div>
+      </div>
+    </section>
+
+    <section id="tab-payouts" class="tab-content">
+      <div class="card owner-only hidden">
+        <h3 id="payout-form-title">Record Payout to Turf Owner</h3>
+        <input type="hidden" id="edit-payout-id" />
+        <div class="form-row">
+          <label>Date <input type="date" id="out-date" /></label>
+          <label>Amount <input type="number" id="out-amount" placeholder="e.g. 2800" step="1" /></label>
+        </div>
+        <label>Note (Optional) <input type="text" id="out-note" placeholder="e.g. Week 2 UPI transfer" /></label>
+        <div class="btn-row">
+          <button id="btn-save-payout" class="btn-primary">Save Payout</button>
+          <button id="btn-cancel-payout" class="btn-secondary hidden">Cancel</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Turf Owner Payout History</h3>
+        <div id="payouts-list" class="record-list"></div>
+      </div>
+    </section>
+
+    <section id="tab-report" class="tab-content">
+      <div class="card">
+        <div class="form-row align-end">
+          <label>Select Month <input type="month" id="report-month" /></label>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card"><span class="stat-label">Play Days</span><strong id="rep-days">0</strong></div>
+          <div class="stat-card"><span class="stat-label">Avg Days / Week</span><strong id="rep-avg-week">0</strong></div>
+          <div class="stat-card"><span class="stat-label">Turf Cost</span><strong id="rep-cost">0</strong></div>
+          <div class="stat-card"><span class="stat-label">Collected</span><strong id="rep-collected">0</strong></div>
+          <div class="stat-card"><span class="stat-label">Paid to Owner</span><strong id="rep-paid">0</strong></div>
+          <div class="stat-card"><span class="stat-label">Monthly Cash Delta</span><strong id="rep-cash">0</strong></div>
+          <div class="stat-card"><span class="stat-label">Month Balance Due</span><strong id="rep-balance">0</strong></div>
+        </div>
+
+        <h4>Per-Member Monthly Breakdown</h4>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Days</th>
+                <th>Share Due</th>
+                <th>Paid in Month</th>
+                <th>Month Net</th>
+              </tr>
+            </thead>
+            <tbody id="report-member-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-members" class="tab-content owner-only hidden">
+      <div class="card">
+        <h3>Your Owner Secret Link</h3>
+        <p class="muted small">Keep this private. Anyone with this link can edit records.</p>
+        <div class="copy-box">
+          <input type="text" id="owner-link-display" readonly />
+          <button id="btn-copy-owner" class="btn-secondary">Copy</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 id="member-form-title">Add New Member</h3>
+        <input type="hidden" id="edit-member-id" />
+        <div class="form-row">
+          <input type="text" id="member-name-input" placeholder="Player full name" />
+          <button id="btn-save-member" class="btn-primary">Save Member</button>
+          <button id="btn-cancel-member" class="btn-secondary hidden">Cancel</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Members & Private View-Only Links</h3>
+        <div id="members-admin-list" class="record-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>
